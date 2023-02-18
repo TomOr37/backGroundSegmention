@@ -45,7 +45,11 @@ def remove_background(model, feature_extractor, image_path, get_only_most_repeat
     :return:
     """
     global background_labels
-    image = Image.open(image_path)
+    background_labels = init_background_labels()
+    try:
+        image = Image.open(image_path)
+    except Exception as e:
+        image = Image.open(requests.get(image_path, stream=True).raw)
     inputs = feature_extractor(images=image, return_tensors="pt")
     outputs = model(**inputs)
     logits = outputs.logits  # shape (batch_size, num_labels, height/4, width/4)
@@ -62,6 +66,7 @@ def remove_background(model, feature_extractor, image_path, get_only_most_repeat
     background_mask_seg = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
     if get_only_most_repeated_label:
         main_label = get_max_repeted_elem(seg)
+        print(f"Most common label: {main_label}")
         mask_seg[seg == main_label, :] = [0, 0, 0]
         background_mask_seg[seg == main_label, :] = [1, 1, 1]
 
@@ -113,7 +118,8 @@ def init_background_labels():
     count as background.(Sky , wall , celling , etc..).
 
     """
-    global background_labels
+
     url_path = "https://raw.githubusercontent.com/CSAILVision/sceneparsing/master/objectInfo150.csv"
     labels_file = pd.read_csv(url_path, index_col=False)
-    background_labels = np.array(labels_file.query("`Stuff` == 1")["Idx"].tolist()) - 1
+    labels = np.array(labels_file.query("`Stuff` == 1")["Idx"].tolist()) - 1
+    return labels
